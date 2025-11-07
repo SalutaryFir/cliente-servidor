@@ -75,31 +75,31 @@ public class ClientHandler implements Runnable {
                             processAndForwardNotification(userMessage, recipientHandler);
                         } else {
                             // Destinatario en otro servidor, reenviar a federación
-                            // Pero PRIMERO procesar localmente para guardar y enviar eco
+                            // PRIMERO: aplicar transcripción si es audio (PERO NO LIMPIAR VARIABLES TODAVÍA)
                             if (userMessage.isAudioMessage()) {
-                                // Para mensajes de audio, aplicar la misma lógica de processAndForwardNotification
                                 if (this.lastUploadedAudioFileName != null && this.lastTranscriptionResult != null) {
                                     userMessage.setContent(this.lastTranscriptionResult);
                                     userMessage.setAudioFileName(this.lastUploadedAudioFileName);
-                                    userMessage.setAudioDataBase64(null);
-                                    
-                                    this.lastUploadedAudioFileName = null;
-                                    this.lastTranscriptionResult = null;
+                                    // NO limpiar todavía, lo necesitamos para forwardToFederation
                                 }
                             }
                             
-                            // Guardar en BD local
+                            // SEGUNDO: Guardar en BD local
                             mensajeService.guardarMensaje(userMessage);
                             
-                            // Enviar eco al emisor
+                            // TERCERO: Enviar eco al emisor (ANTES de reenviar a federación)
                             Packet echoPacket = new Packet(ActionType.NEW_MESSAGE, userMessage);
                             this.sendPacket(echoPacket);
                             System.out.println("📤 Eco enviado al emisor: " + userMessage.getSender() + " (destinatario remoto)");
                             
-                            // Reenviar a federación
+                            // CUARTO: Reenviar a federación (esto incluirá el audio en Base64)
                             if (!forwardToFederation(userMessage)) {
-                                System.err.println("Destinatario " + userMessage.getRecipient() + " no encontrado ni local ni en federación.");
+                                System.err.println("❌ Destinatario " + userMessage.getRecipient() + " no encontrado en federación.");
                             }
+                            
+                            // QUINTO: AHORA sí limpiamos las variables temporales
+                            this.lastUploadedAudioFileName = null;
+                            this.lastTranscriptionResult = null;
                         }
                         break;
                     case SEND_MESSAGE_TO_CHANNEL:
@@ -175,14 +175,19 @@ public class ClientHandler implements Runnable {
                 uniqueFileName = this.lastUploadedAudioFileName;
                 finalTextContent = this.lastTranscriptionResult; // La transcripción REAL
 
-                // Limpiamos las variables temporales
-                this.lastUploadedAudioFileName = null;
-                this.lastTranscriptionResult = null;
+                // SOLO limpiamos si NO es un mensaje que irá a federación después
+                // Para mensajes de canal, NO limpiamos aquí
+                if (singleRecipient != null) {
+                    // Es mensaje privado local, sí limpiamos
+                    this.lastUploadedAudioFileName = null;
+                    this.lastTranscriptionResult = null;
+                }
+                // Para canales, se limpiará en forwardChannelMessageToFederation
             } else {
                 // Fallback si algo falló MUY gravemente en handleAudioUpload
                 uniqueFileName = "error_al_subir.wav";
                 finalTextContent = "[Error interno procesando audio]";
-                System.err.println("ERROR GRAVE: processAndForwardNotification llamado para audio sin datos previos.");
+                System.err.println("❌ ERROR: processAndForwardNotification llamado para audio sin datos previos.");
             }
 
             // Actualizamos el DTO con los datos CORRECTOS para la DB y la notificación
@@ -203,7 +208,7 @@ public class ClientHandler implements Runnable {
             // Mensaje Privado
             singleRecipient.sendPacket(forwardPacket); // Siempre enviar al destinatario
             this.sendPacket(forwardPacket); // Eco al emisor
-            System.out.println("Notificación de mensaje enviada a " + messageNotification.getRecipient() + " y eco a " + messageNotification.getSender());
+            System.out.println("📨 Notificación de mensaje enviada a " + messageNotification.getRecipient() + " y eco a " + messageNotification.getSender());
 
         } else { 
             // Mensaje de Canal
@@ -222,12 +227,12 @@ public class ClientHandler implements Runnable {
                         System.out.println("📢 Reenviando notificación de canal a " + miembros.size() + " miembros locales (sin emisor).");
                         tcpServer.broadcastToUserList(forwardPacket, miembros);
                     } else {
-                        System.out.println("📢 Solo el emisor está conectado localmente al canal.");
+                        System.out.println("ℹ️ No hay otros miembros locales conectados al canal.");
                     }
                 },
                 () -> {
                     // El canal no existe localmente (es remoto), pero el eco ya se envió
-                    System.out.println("📢 Canal remoto, eco enviado al emisor: " + messageNotification.getSender());
+                    System.out.println("ℹ️ Canal remoto, solo eco enviado al emisor: " + messageNotification.getSender());
                 }
             );
         }
@@ -506,6 +511,10 @@ public class ClientHandler implements Runnable {
             } catch (IOException e) {
                 System.err.println("❌ Error leyendo audio para federación: " + e.getMessage());
             }
+            
+            // AHORA sí limpiamos las variables temporales después de leer el archivo
+            this.lastUploadedAudioFileName = null;
+            this.lastTranscriptionResult = null;
         }
         
         FederatedMessageDTO fedMsg = new FederatedMessageDTO();
@@ -522,6 +531,4 @@ public class ClientHandler implements Runnable {
         tcpServer.getServerRegistry().broadcastToFederation(fedPacket);
         System.out.println("📡 Mensaje de canal reenviado a federación: " + message.getRecipient());
     }
-
-
 }
