@@ -201,10 +201,8 @@ public class ClientHandler implements Runnable {
         // Lógica de reenvío
         if (singleRecipient != null) { 
             // Mensaje Privado
-            if (singleRecipient != this) {
-                singleRecipient.sendPacket(forwardPacket);
-            }
-            this.sendPacket(forwardPacket); // Eco
+            singleRecipient.sendPacket(forwardPacket); // Siempre enviar al destinatario
+            this.sendPacket(forwardPacket); // Eco al emisor
             System.out.println("Notificación de mensaje enviada a " + messageNotification.getRecipient() + " y eco a " + messageNotification.getSender());
 
         } else { 
