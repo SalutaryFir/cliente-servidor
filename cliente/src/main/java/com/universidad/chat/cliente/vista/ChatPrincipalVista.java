@@ -579,6 +579,46 @@ public class ChatPrincipalVista extends JFrame implements PropertyChangeListener
                     }
                     break;
 
+                case MESSAGE_HISTORY:
+                    // Recibimos historial de mensajes de una conversación o canal
+                    MessageHistoryDTO history = (MessageHistoryDTO) receivedPacket.getPayload();
+                    String historyChat = history.getChatId(); // Username del contacto o nombre del canal
+                    List<MessageDTO> messages = history.getMessages();
+                    
+                    System.out.println("📜 Historial recibido para " + historyChat + ": " + messages.size() + " mensajes");
+                    
+                    // Determinar si es un canal o usuario
+                    String historyChatTarget = historyChat.startsWith("#") ? "channel:" + historyChat : "user:" + historyChat;
+                    
+                    // Agregar cada mensaje del historial al panel correspondiente
+                    for (MessageDTO msg : messages) {
+                        String senderName = msg.getSender();
+                        boolean isOwnMessage = senderName.equals(usuarioActual.getUsername());
+                        
+                        String historyDisplayText;
+                        String audioFile = null;
+                        
+                        if (msg.isAudioMessage()) {
+                            audioFile = msg.getAudioFileName();
+                            historyDisplayText = (historyChat.startsWith("#") ? "[" + historyChat + "] " : "") +
+                                    (isOwnMessage ? "Yo" : senderName) +
+                                    " envió un audio: " + msg.getContent();
+                        } else {
+                            if (isOwnMessage) {
+                                historyDisplayText = "Yo -> " + msg.getRecipient() + ": " + msg.getContent();
+                            } else {
+                                historyDisplayText = (historyChat.startsWith("#") ? "[" + historyChat + "] " : "") +
+                                        senderName + " dice: " + msg.getContent();
+                            }
+                        }
+                        
+                        // Agregar al panel SIN hacer scroll automático (historial)
+                        addMessageToPanel(historyChatTarget, historyDisplayText, audioFile, false);
+                    }
+                    
+                    System.out.println("✅ Historial de " + historyChat + " cargado en la interfaz");
+                    break;
+
                 default:
                     // Ignorar otras acciones no manejadas en la vista del chat
                     break;

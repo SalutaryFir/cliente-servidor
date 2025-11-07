@@ -26,6 +26,7 @@ public enum ActionType implements Serializable {
     INVITE_SUCCESS,      // Notificación al usuario que ENVIÓ la invitación
     INVITE_FAILURE,
     AUDIO_DATA_RESPONSE,
+    MESSAGE_HISTORY,     // Historial de mensajes (privados o de canal)
 
     // Acciones nuevas para canales
     CREATE_CHANNEL_SUCCESS,

@@ -32,6 +32,7 @@ public class ClientHandler implements Runnable {
     private final TranscriptionService transcriptionService;
     private final Socket clientSocket;
     private final TCPServer tcpServer;
+    private final com.universidad.chat.servidor.repository.UsuarioRepository usuarioRepository;
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
     private UserDTO authenticatedUser;
@@ -39,7 +40,7 @@ public class ClientHandler implements Runnable {
     private String lastTranscriptionResult = null;
 
     // Constructor
-    public ClientHandler(Socket socket, UsuarioService us, TCPServer ts, CanalService cs, CanalRepository cr, MensajeService ms, TranscriptionService tsc) {
+    public ClientHandler(Socket socket, UsuarioService us, TCPServer ts, CanalService cs, CanalRepository cr, MensajeService ms, TranscriptionService tsc, com.universidad.chat.servidor.repository.UsuarioRepository ur) {
         this.clientSocket = socket;
         this.usuarioService = us;
         this.tcpServer = ts;
@@ -47,6 +48,7 @@ public class ClientHandler implements Runnable {
         this.canalRepository = cr;
         this.mensajeService = ms;
         this.transcriptionService = tsc;
+        this.usuarioRepository = ur;
     }
 
     @Override
@@ -302,6 +304,9 @@ public class ClientHandler implements Runnable {
 
             // Notificamos a los demás que nos hemos conectado
             broadcastUserListUpdate();
+            
+            // NUEVO: Enviar historial de mensajes
+            enviarHistorialMensajes(userInfo.getUsername(), allUsernames, misCanales);
         } catch (IllegalStateException e) {
             Packet failurePacket = new Packet(ActionType.LOGIN_FAILURE, e.getMessage());
             sendPacket(failurePacket);
@@ -435,16 +440,47 @@ public class ClientHandler implements Runnable {
                 Packet federatedResponse = new Packet(ActionType.FEDERATED_INVITATION_RESPONSE, response);
                 tcpServer.getServerRegistry().broadcastToFederation(federatedResponse);
                 
-                // Agregar el canal a la lista local del usuario aunque sea remoto
-                // (esto es para que le aparezca en su lista de canales)
+                // NUEVO: Crear registro del canal remoto en BD local para persistir la membresía
+                try {
+                    // Buscar o crear el canal remoto en BD local
+                    Canal canalRemoto = canalRepository.findByNombreCanal(response.getChannelName())
+                        .orElseGet(() -> {
+                            // El canal no existe localmente, crearlo como canal remoto
+                            Canal nuevoCanal = new Canal();
+                            nuevoCanal.setNombreCanal(response.getChannelName());
+                            
+                            // Buscar o crear un usuario temporal para el creador remoto
+                            Usuario creadorRemoto = usuarioRepository.findByNombreUsuario(response.getInviterUsername())
+                                .orElseGet(() -> {
+                                    Usuario nuevoCreador = new Usuario();
+                                    nuevoCreador.setNombreUsuario(response.getInviterUsername());
+                                    nuevoCreador.setEmail(response.getInviterUsername() + "@remote.server");
+                                    nuevoCreador.setPassword("REMOTE_USER");
+                                    return usuarioRepository.save(nuevoCreador);
+                                });
+                            
+                            nuevoCanal.setCreador(creadorRemoto);
+                            return canalRepository.save(nuevoCanal);
+                        });
+                    
+                    // Agregar al usuario invitado como miembro
+                    Usuario usuarioLocal = usuarioRepository.findByNombreUsuario(response.getInvitedUsername())
+                        .orElseThrow(() -> new IllegalStateException("Usuario local no encontrado"));
+                    
+                    if (!canalRemoto.getMiembros().contains(usuarioLocal)) {
+                        canalRemoto.getMiembros().add(usuarioLocal);
+                        canalRepository.save(canalRemoto);
+                        System.out.println("✅ Usuario " + response.getInvitedUsername() + " agregado al canal remoto " + response.getChannelName() + " en BD local");
+                    }
+                    
+                } catch (Exception e) {
+                    System.err.println("❌ Error agregando usuario a canal remoto en BD local: " + e.getMessage());
+                }
+                
+                // Enviar lista actualizada de canales al usuario
                 List<String> susCanales = canalService.findCanalesPorMiembro(response.getInvitedUsername()).stream()
                         .map(Canal::getNombreCanal)
                         .collect(Collectors.toList());
-                
-                // Agregar manualmente el canal remoto a la lista
-                if (!susCanales.contains(response.getChannelName())) {
-                    susCanales.add(response.getChannelName());
-                }
                 
                 Packet channelListPacket = new Packet(ActionType.CHANNEL_LIST_UPDATE, susCanales);
                 sendPacket(channelListPacket);
@@ -530,5 +566,38 @@ public class ClientHandler implements Runnable {
 
         tcpServer.getServerRegistry().broadcastToFederation(fedPacket);
         System.out.println("📡 Mensaje de canal reenviado a federación: " + message.getRecipient());
+    }
+    
+    /**
+     * Envía el historial de mensajes al usuario que acaba de iniciar sesión
+     */
+    private void enviarHistorialMensajes(String username, List<String> todosLosUsuarios, List<String> misCanales) {
+        System.out.println("📜 Enviando historial de mensajes a " + username);
+        
+        // 1. Enviar historial de conversaciones privadas con cada usuario
+        for (String otroUsuario : todosLosUsuarios) {
+            if (otroUsuario.equals(username)) continue; // Saltear a sí mismo
+            
+            List<MessageDTO> historial = mensajeService.obtenerHistorialPrivado(username, otroUsuario);
+            if (!historial.isEmpty()) {
+                MessageHistoryDTO historyDTO = new MessageHistoryDTO(otroUsuario, historial);
+                Packet historyPacket = new Packet(ActionType.MESSAGE_HISTORY, historyDTO);
+                sendPacket(historyPacket);
+                System.out.println("  📨 Enviados " + historial.size() + " mensajes de conversación con " + otroUsuario);
+            }
+        }
+        
+        // 2. Enviar historial de cada canal del que es miembro
+        for (String canal : misCanales) {
+            List<MessageDTO> historial = mensajeService.obtenerHistorialCanal(canal);
+            if (!historial.isEmpty()) {
+                MessageHistoryDTO historyDTO = new MessageHistoryDTO(canal, historial);
+                Packet historyPacket = new Packet(ActionType.MESSAGE_HISTORY, historyDTO);
+                sendPacket(historyPacket);
+                System.out.println("  📨 Enviados " + historial.size() + " mensajes del canal " + canal);
+            }
+        }
+        
+        System.out.println("✅ Historial de mensajes enviado completamente a " + username);
     }
 }

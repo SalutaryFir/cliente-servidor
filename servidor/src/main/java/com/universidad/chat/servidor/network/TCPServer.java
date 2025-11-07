@@ -96,7 +96,7 @@ public class TCPServer {
                     log("Nuevo cliente intentando conectar desde: " + clientSocket.getInetAddress());
 
                     // Create handler and start its thread
-                    ClientHandler clientHandler = new ClientHandler(clientSocket, usuarioService, this, canalService, canalRepository, mensajeService, transcriptionService);
+                    ClientHandler clientHandler = new ClientHandler(clientSocket, usuarioService, this, canalService, canalRepository, mensajeService, transcriptionService, usuarioRepository);
                     new Thread(clientHandler).start();
                 }
             } catch (IOException e) {
