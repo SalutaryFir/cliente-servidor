@@ -153,16 +153,54 @@ public class OutgoingConnectionHandler implements Runnable {
         System.out.println("💬 Mensaje federado recibido en OutgoingConnectionHandler de: " + fedMsg.getOriginServerName());
         
         if (tcpServer != null) {
-            tcpServer.broadcastMessageToLocalClients(fedMsg);
+            com.universidad.chat.comun.dto.MessageDTO message = fedMsg.getMessage();
+            
+            // Si es un mensaje de audio Y tiene datos Base64, guardar el archivo localmente
+            if (message.isAudioMessage() && message.getAudioDataBase64() != null) {
+                try {
+                    byte[] audioData = java.util.Base64.getDecoder().decode(message.getAudioDataBase64());
+                    java.io.File audioDir = new java.io.File("audio_files");
+                    if (!audioDir.exists()) audioDir.mkdir();
+                    
+                    // Usar el mismo nombre de archivo que tiene el mensaje
+                    java.io.File audioFile = new java.io.File(audioDir, message.getAudioFileName());
+                    
+                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(audioFile)) {
+                        fos.write(audioData);
+                    }
+                    System.out.println("🔊 Audio federado guardado localmente: " + message.getAudioFileName());
+                    
+                    // Limpiar los datos Base64 para no enviarlos al cliente
+                    message.setAudioDataBase64(null);
+                } catch (Exception e) {
+                    System.err.println("❌ Error guardando audio federado: " + e.getMessage());
+                }
+            }
+            
+            // Buscar destinatario local
+            ClientHandler recipient = tcpServer.findClientByUsername(message.getRecipient());
+            
+            if (recipient != null) {
+                // El usuario está aquí, reenviar el mensaje
+                Packet forwardPacket = new Packet(ActionType.NEW_MESSAGE, message);
+                recipient.sendPacket(forwardPacket);
+                System.out.println("📨 Mensaje federado entregado a " + message.getRecipient());
+            } else if (message.getRecipient().startsWith("#")) {
+                // Es un mensaje de canal - broadcast a todos los clientes locales
+                Packet forwardPacket = new Packet(ActionType.NEW_MESSAGE, message);
+                tcpServer.broadcastPacket(forwardPacket);
+                System.out.println("📨 Mensaje federado de canal " + message.getRecipient() + " broadcast a clientes locales");
+            } else {
+                System.err.println("⚠️ Destinatario " + message.getRecipient() + " no encontrado localmente");
+            }
         }
     }
 
     private void handleFederatedAudio(FederatedMessageDTO fedMsg) {
         System.out.println("🔊 Audio federado recibido en OutgoingConnectionHandler de: " + fedMsg.getOriginServerName());
         
-        if (tcpServer != null) {
-            tcpServer.broadcastAudioToLocalClients(fedMsg);
-        }
+        // Reutilizar la misma lógica que handleFederatedMessage
+        handleFederatedMessage(fedMsg);
     }
     
     private void handleFederatedChannelInvite(InvitationDTO invitation) {

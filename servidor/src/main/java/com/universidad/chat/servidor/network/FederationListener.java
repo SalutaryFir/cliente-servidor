@@ -258,16 +258,28 @@ public class FederationListener {
                 recipient.sendPacket(forwardPacket);
                 System.out.println("📨 Mensaje federado entregado a " + message.getRecipient());
             } else if (message.getRecipient().startsWith("#")) {
-                // Es un canal, broadcast a miembros locales del canal
-                canalRepository.findByNombreCanal(message.getRecipient()).ifPresent(canal -> {
+                // Es un mensaje de canal
+                // CASO 1: El canal existe localmente (este servidor tiene el canal en su BD)
+                java.util.Optional<Canal> canalOpt = canalRepository.findByNombreCanal(message.getRecipient());
+                
+                if (canalOpt.isPresent()) {
+                    // El canal existe aquí, broadcast a todos los miembros locales
+                    Canal canal = canalOpt.get();
                     java.util.Set<String> miembrosLocales = canal.getMiembros().stream()
                             .map(u -> u.getNombreUsuario())
                             .collect(java.util.stream.Collectors.toSet());
                     
                     Packet forwardPacket = new Packet(ActionType.NEW_MESSAGE, message);
                     tcpServer.broadcastToUserList(forwardPacket, miembrosLocales);
-                    System.out.println("📨 Mensaje federado de canal entregado a " + miembrosLocales.size() + " miembros locales");
-                });
+                    System.out.println("📨 Mensaje federado de canal entregado a " + miembrosLocales.size() + " miembros locales del canal " + message.getRecipient());
+                } else {
+                    // CASO 2: El canal NO existe localmente (canal está en servidor remoto)
+                    // Broadcast a TODOS los usuarios conectados localmente
+                    // (asumimos que si recibimos el mensaje federado, hay usuarios locales en ese canal remoto)
+                    Packet forwardPacket = new Packet(ActionType.NEW_MESSAGE, message);
+                    tcpServer.broadcastPacket(forwardPacket);  // ✅ Usar el Packet correcto
+                    System.out.println("📨 Mensaje federado de canal remoto " + message.getRecipient() + " broadcast a todos los clientes locales");
+                }
             } else {
                 System.err.println("⚠️ Destinatario " + message.getRecipient() + " no encontrado localmente");
             }
