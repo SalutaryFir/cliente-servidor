@@ -372,4 +372,13 @@ public class TCPServer {
             );
         });
     }
+    
+    /**
+     * Obtiene la lista de clientes conectados (para API REST)
+     */
+    public List<ClientHandler> getClients() {
+        synchronized (clients) {
+            return new ArrayList<>(clients);
+        }
+    }
 }

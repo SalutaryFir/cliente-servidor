@@ -1,0 +1,57 @@
+{
+  "servers": [
+    {
+      "id": "server1",
+      "name": "Servidor-1",
+      "apiUrl": "http://localhost:8080/api/v1/server",
+      "httpPort": 8080,
+      "tcpPort": 9999,
+      "federationPort": 5001
+    },
+    {
+      "id": "server2",
+      "name": "Servidor-2",
+      "apiUrl": "http://localhost:8081/api/v1/server",
+      "httpPort": 8081,
+      "tcpPort": 9999,
+      "federationPort": 5002
+    },
+    {
+      "id": "server3",
+      "name": "Servidor-3",
+      "apiUrl": "http://localhost:8082/api/v1/server",
+      "httpPort": 8082,
+      "tcpPort": 9999,
+      "federationPort": 5003
+    },
+    {
+      "id": "server4",
+      "name": "Servidor-4",
+      "apiUrl": "http://localhost:8083/api/v1/server",
+      "httpPort": 8083,
+      "tcpPort": 9999,
+      "federationPort": 5004
+    }
+  ],
+  "apiGateway": {
+    "enabled": false,
+    "url": "http://localhost:8000",
+    "routes": {
+      "server1": "/server1",
+      "server2": "/server2",
+      "server3": "/server3",
+      "server4": "/server4"
+    }
+  },
+  "endpoints": {
+    "health": "/health",
+    "info": "/info",
+    "users": "/users",
+    "usersConnected": "/users/connected",
+    "channels": "/channels",
+    "logs": "/logs",
+    "stats": "/stats",
+    "report": "/report",
+    "federation": "/federation"
+  }
+}

@@ -400,4 +400,13 @@ public class ServerRegistry {
             connectToServer(remoteIP, remoteFedPort);
         }
     }
+    
+    /**
+     * Obtiene la lista de todos los servidores federados (para API REST)
+     */
+    public java.util.List<ServerInfoDTO> getAllServers() {
+        return federatedServers.values().stream()
+                .map(fs -> fs.info)
+                .collect(java.util.stream.Collectors.toList());
+    }
 }
