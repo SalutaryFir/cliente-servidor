@@ -45,3 +45,20 @@ Thumbs.db
 
 # Vosk model (muy grande, no versionar)
 vosk-model-small-es-0.42/
+
+# Node modules (Frontend)
+node_modules/
+web-admin/node_modules/
+web-admin/dist/
+web-admin/.env
+web-admin/.env.local
+
+# Docker volumes data
+.docker/
+
+# Monitoring data (Prometheus, Grafana, Loki, Tempo)
+monitoring/data/
+prometheus_data/
+grafana_data/
+loki_data/
+tempo_data/
