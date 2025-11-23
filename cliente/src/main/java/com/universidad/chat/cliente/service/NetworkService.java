@@ -1,8 +1,6 @@
 package com.universidad.chat.cliente.service;
 
 import com.universidad.chat.comun.dto.Packet;
-import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.beans.PropertyChangeListener;
@@ -15,16 +13,10 @@ import java.net.Socket;
 @Service
 public class NetworkService {
 
-    @Value("${chat.client.server-address:localhost}")
-    private String serverAddress;
-
-    @Value("${chat.client.server-port:5000}")
-    private int serverPort;
-
     private Socket socket;
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
-
+    private boolean connected = false;
 
     // --- IMPLEMENTACIÓN DEL PATRÓN OBSERVER ---
     // PropertyChangeSupport es una clase de ayuda de Java para implementar el patrón Observer fácilmente.
@@ -39,20 +31,42 @@ public class NetworkService {
     }
     // --- FIN DE LA IMPLEMENTACIÓN ---
 
-    @PostConstruct
-    public void connect() {
+    /**
+     * Conecta al cliente con el servidor especificado
+     * @param serverAddress IP o hostname del servidor
+     * @param serverPort Puerto del servidor
+     * @return true si la conexión fue exitosa, false en caso contrario
+     */
+    public boolean connect(String serverAddress, int serverPort) {
+        if (connected) {
+            System.out.println("Ya existe una conexión activa.");
+            return true;
+        }
+        
         try {
+            System.out.println("Intentando conectar a " + serverAddress + ":" + serverPort + "...");
             socket = new Socket(serverAddress, serverPort);
             outputStream = new ObjectOutputStream(socket.getOutputStream());
             inputStream = new ObjectInputStream(socket.getInputStream());
-            System.out.println("Conectado al servidor en " + serverAddress + ":" + serverPort);
+            connected = true;
+            System.out.println("✅ Conectado exitosamente al servidor en " + serverAddress + ":" + serverPort);
 
             // ¡Iniciamos un hilo para escuchar al servidor!
             startListening();
+            return true;
 
         } catch (IOException e) {
-            System.err.println("Error al conectar con el servidor: " + e.getMessage());
+            System.err.println("❌ Error al conectar con el servidor: " + e.getMessage());
+            connected = false;
+            return false;
         }
+    }
+    
+    /**
+     * Verifica si el cliente está conectado al servidor
+     */
+    public boolean isConnected() {
+        return connected && socket != null && socket.isConnected() && !socket.isClosed();
     }
 
     private void startListening() {
@@ -70,6 +84,7 @@ public class NetworkService {
                 }
             } catch (IOException | ClassNotFoundException e) {
                 System.err.println("Desconectado del servidor: " + e.getMessage());
+                connected = false;
             }
         }).start();
     }

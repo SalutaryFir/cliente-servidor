@@ -2,6 +2,7 @@ package com.universidad.chat.servidor.model;
 
 import jakarta.persistence.*;
 import lombok.Data; // <-- Make sure this import is present
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -28,4 +29,14 @@ public class Canal {
             inverseJoinColumns = @JoinColumn(name = "usuario_id")
     )
     private Set<Usuario> miembros = new HashSet<>();
+    
+    @Column(name = "fecha_creacion")
+    private LocalDateTime fechaCreacion;
+    
+    @PrePersist
+    protected void onCreate() {
+        if (fechaCreacion == null) {
+            fechaCreacion = LocalDateTime.now();
+        }
+    }
 }

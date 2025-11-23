@@ -1,0 +1,100 @@
+# Configuración Docker Compose para API Gateway + Servidores de Chat
+
+version: '3.8'
+
+services:
+  # API Gateway (Kong)
+  kong-database:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: kong
+      POSTGRES_DB: kong
+      POSTGRES_PASSWORD: kong
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+    networks:
+      - chat-network
+
+  kong-migration:
+    image: kong:3.4
+    command: kong migrations bootstrap
+    depends_on:
+      - kong-database
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+    networks:
+      - chat-network
+    restart: on-failure
+
+  kong:
+    image: kong:3.4
+    depends_on:
+      - kong-database
+      - kong-migration
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    ports:
+      - "8000:8000"   # Proxy HTTP
+      - "8443:8443"   # Proxy HTTPS
+      - "8001:8001"   # Admin API HTTP
+      - "8444:8444"   # Admin API HTTPS
+    networks:
+      - chat-network
+    restart: always
+
+  # Servidores de Chat (solo si quieres dockerizarlos también)
+  # Descomenta si decides dockerizar los servidores Java
+  # chat-server-1:
+  #   build: ./servidor
+  #   ports:
+  #     - "8080:8080"
+  #     - "9999:9999"
+  #     - "5001:5001"
+  #   environment:
+  #     - SPRING_PROFILES_ACTIVE=server1
+  #   networks:
+  #     - chat-network
+  #
+  # chat-server-2:
+  #   build: ./servidor
+  #   ports:
+  #     - "8081:8081"
+  #     - "5002:5002"
+  #   environment:
+  #     - SPRING_PROFILES_ACTIVE=server2
+  #   networks:
+  #     - chat-network
+
+  # Aplicación Web Administrativa (Frontend)
+  web-admin:
+    build: ./web-admin
+    ports:
+      - "3000:80"
+    depends_on:
+      - kong
+    networks:
+      - chat-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  kong_data:
+
+networks:
+  chat-network:
+    driver: bridge
