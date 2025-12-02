@@ -25,11 +25,11 @@ echo.
 echo [2/4] Creando servicio server1...
 curl -i -X POST http://localhost:8001/services/ ^
   --data "name=server1" ^
-  --data "url=http://host.docker.internal:8080"
+  --data "url=http://192.168.137.82:8081"
 
 echo.
 echo [3/4] Creando ruta /server1...
-curl -i -X POST http://localhost:8001/services/server1/routes ^
+curl -i -X POST http://192.168.137.82:8001/services/server1/routes ^
   --data "paths[]=/server1" ^
   --data "strip_path=true"
 
@@ -67,7 +67,7 @@ echo   RUTAS CONFIGURADAS
 echo ========================================
 echo.
 echo Rutas creadas:
-echo   - http://localhost:8000/server1 → localhost:8080
+echo   - http://localhost:8000/server1 → 192.168.137.82:8080
 echo   - http://localhost:8000/server2 → localhost:8081
 echo   - http://localhost:8000/server3 → localhost:8082
 echo   - http://localhost:8000/server4 → localhost:8083

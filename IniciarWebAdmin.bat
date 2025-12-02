@@ -20,7 +20,7 @@ if not exist "node_modules\" (
 
 echo [2/2] Iniciando servidor de desarrollo...
 echo.
-echo Web Admin estará disponible en: http://localhost:5173
+echo Web Admin estará disponible en: http://192.168.137.253:5173
 echo.
 call npm run dev
 

@@ -590,7 +590,7 @@ Web Admin (Vite)
 ## 🚀 Diagrama de Despliegue
 
 ```
-MÁQUINA 1 (PC1)
+MÁQUINA 1 (PC1) - 192.168.137.82
 ├── Kong (Puerto 8000-8001)
 └── Servidor 1 (Puerto 8080)
 
@@ -603,7 +603,7 @@ MÁQUINA 3 (PC3)
 MÁQUINA 4 (PC4)
 ├── Servidor 4 (Puerto 8083)
 
-MÁQUINA 1 (PC1)
+MÁQUINA 1 (PC1) - 192.168.137.82
 └── Web Admin (Puerto 5173)
     └─ Accede a Kong (8000)
        └─ Kong enruta a Servidores 1-4

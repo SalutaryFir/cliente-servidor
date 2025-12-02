@@ -34,8 +34,8 @@
     }
   ],
   "apiGateway": {
-    "enabled": false,
-    "url": "http://localhost:8000",
+    "enabled": true,
+    "url": "http://192.168.137.253:8000",
     "routes": {
       "server1": "/server1",
       "server2": "/server2",

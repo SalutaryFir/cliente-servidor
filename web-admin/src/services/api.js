@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8000';
+const API_GATEWAY_URL = 'http://192.168.137.253:8000';
 
 // Configuración de servidores
 export const SERVERS = [

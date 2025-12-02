@@ -13,10 +13,13 @@ Cada computador debe tener instalado:
 
 ## 🗂️ **Distribución por Computador**
 
-### **Computador 1 (Coordinador)**
-- Servidor 1 (Coordinador)
+### **Computador Gateway + Web Admin (192.168.137.253)**
 - Kong API Gateway
 - Web Admin
+- Cliente de prueba
+
+### **Computador 1 (192.168.137.82)**
+- Servidor 1 (Coordinador)
 - Cliente de prueba
 
 ### **Computador 2**
@@ -61,7 +64,7 @@ spring.datasource.password=TU_PASSWORD
 
 ## 🚀 **2. INICIAR SERVICIOS (En orden)**
 
-### **PASO 1: Computador 1 - API Gateway (Opcional pero recomendado)**
+### **PASO 1: PC Gateway (192.168.137.253) - API Gateway y Web Admin**
 
 ```bash
 # 1. Iniciar Kong
@@ -73,9 +76,9 @@ spring.datasource.password=TU_PASSWORD
 
 ---
 
-### **PASO 2: Iniciar Servidores en TODOS los computadores**
+### **PASO 2: Iniciar Servidores en sus respectivos computadores**
 
-#### En **Computador 1:**
+#### En **Computador 1 (192.168.137.82):**
 ```bash
 .\IniciarServidor1.bat
 ```
@@ -101,30 +104,30 @@ spring.datasource.password=TU_PASSWORD
 
 ### **PASO 3: Federar Servidores**
 
-Desde **Computador 1**, conecta todos los servidores:
+Desde **Computador 1 (192.168.137.82)**, conecta todos los servidores:
 
 ```bash
 # Conectar Servidor 1 con Servidor 2
-curl -X POST "http://localhost:8080/api/v1/server/federation/connect?ip=IP_PC2&port=5003"
+curl -X POST "http://192.168.137.82:8080/api/v1/server/federation/connect?ip=IP_PC2&port=5003"
 
 # Conectar Servidor 1 con Servidor 3
-curl -X POST "http://localhost:8080/api/v1/server/federation/connect?ip=IP_PC3&port=5005"
+curl -X POST "http://192.168.137.82:8080/api/v1/server/federation/connect?ip=IP_PC3&port=5005"
 
 # Conectar Servidor 1 con Servidor 4
-curl -X POST "http://localhost:8080/api/v1/server/federation/connect?ip=IP_PC4&port=5007"
+curl -X POST "http://192.168.137.82:8080/api/v1/server/federation/connect?ip=IP_PC4&port=5007"
 ```
 
 **Reemplaza** `IP_PC2`, `IP_PC3`, `IP_PC4` con las IPs reales de cada computador.
 
 ---
 
-### **PASO 4: Iniciar Web Admin (Solo Computador 1)**
+### **PASO 4: Iniciar Web Admin (PC Gateway 192.168.137.253)**
 
 ```bash
 .\IniciarWebAdmin.bat
 ```
 
-Accede desde el navegador: **http://localhost:5173**
+Accede desde el navegador: **http://192.168.137.253:5173**
 
 ---
 
@@ -273,11 +276,11 @@ mvn package -DskipTests
 
 ## 📞 **9. URLs IMPORTANTES**
 
-### **Computador 1:**
-- Web Admin: http://localhost:5173
-- Servidor 1 API: http://localhost:8080/api/v1/server/info
-- Kong Gateway: http://localhost:8000
-- Kong Admin: http://localhost:8001
+### **Computador 1 (192.168.137.82):**
+- Web Admin: http://192.168.137.82:5173
+- Servidor 1 API: http://192.168.137.82:8080/api/v1/server/info
+- Kong Gateway: http://192.168.137.82:8000
+- Kong Admin: http://192.168.137.82:8001
 
 ### **Otros Computadores:**
 - Servidor X API: http://IP_PCX:808X/api/v1/server/info
