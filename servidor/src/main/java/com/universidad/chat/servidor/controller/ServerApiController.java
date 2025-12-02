@@ -205,26 +205,33 @@ public class ServerApiController {
             @RequestParam(required = false) String source
     ) {
         try {
-            List<ServerLogResponseDTO.LogEntryDTO> logs;
+            List<ServerLogResponseDTO.LogEntryDTO> logs = new ArrayList<>();
 
-            if (level != null) {
-                logs = logService.getLogsByLevel(level);
-            } else if (source != null) {
-                logs = logService.getLogsBySource(source);
-            } else {
-                logs = logService.getRecentLogs(limit);
+            try {
+                if (level != null && !level.isEmpty()) {
+                    logs = logService.getLogsByLevel(level);
+                } else if (source != null && !source.isEmpty()) {
+                    logs = logService.getLogsBySource(source);
+                } else {
+                    logs = logService.getRecentLogs(limit);
+                }
+            } catch (Exception logException) {
+                System.err.println("⚠️ Error obteniendo logs del servicio: " + logException.getMessage());
+                logException.printStackTrace();
+                logs = new ArrayList<>();
             }
 
             ServerLogResponseDTO response = new ServerLogResponseDTO(
-                    logs.size(),
-                    logs
+                    logs != null ? logs.size() : 0,
+                    logs != null ? logs : new ArrayList<>()
             );
 
             return ResponseEntity.ok(ApiResponseDTO.success(response));
         } catch (Exception e) {
-            logService.error("Error al obtener logs: " + e.getMessage(), "ServerApiController");
+            System.err.println("❌ Error crítico al obtener logs: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDTO.error("Error al obtener logs"));
+                    .body(ApiResponseDTO.error("Error al obtener logs: " + e.getMessage()));
         }
     }
 
@@ -366,35 +373,65 @@ public class ServerApiController {
             @RequestParam(defaultValue = "50") int limit
     ) {
         try {
-            // Obtener mensajes que tienen audio (rutaAudio no nulo)
-            List<AudioListResponseDTO.AudioInfoDTO> audioList = mensajeRepository.findAll().stream()
-                    .filter(mensaje -> mensaje.getRutaAudio() != null && !mensaje.getRutaAudio().isEmpty())
-                    .sorted((m1, m2) -> m2.getTimestamp().compareTo(m1.getTimestamp())) // Más recientes primero
-                    .limit(limit)
-                    .map(mensaje -> {
-                        String recipient;
-                        boolean isChannel = false;
-                        
-                        if (mensaje.getReceptorCanal() != null) {
-                            recipient = mensaje.getReceptorCanal().getNombreCanal();
-                            isChannel = true;
-                        } else if (mensaje.getReceptorUsuario() != null) {
-                            recipient = mensaje.getReceptorUsuario().getNombreUsuario();
-                        } else {
-                            recipient = "Desconocido";
-                        }
-                        
-                        return new AudioListResponseDTO.AudioInfoDTO(
-                                mensaje.getId(),
-                                mensaje.getEmisor().getNombreUsuario(),
-                                recipient,
-                                mensaje.getRutaAudio(),
-                                mensaje.getContenidoTexto(), // La transcripción está en contenidoTexto
-                                mensaje.getTimestamp().toString(),
-                                isChannel
-                        );
-                    })
-                    .collect(Collectors.toList());
+            List<AudioListResponseDTO.AudioInfoDTO> audioList = new ArrayList<>();
+            
+            try {
+                audioList = mensajeRepository.findAll().stream()
+                        .filter(mensaje -> {
+                            // Validar que el mensaje tenga audio y emisor
+                            return mensaje != null && 
+                                   mensaje.getRutaAudio() != null && 
+                                   !mensaje.getRutaAudio().isEmpty() &&
+                                   mensaje.getEmisor() != null;
+                        })
+                        .sorted((m1, m2) -> {
+                            // Manejo seguro de timestamps
+                            if (m1.getTimestamp() == null || m2.getTimestamp() == null) {
+                                return 0;
+                            }
+                            return m2.getTimestamp().compareTo(m1.getTimestamp());
+                        })
+                        .limit(limit)
+                        .map(mensaje -> {
+                            try {
+                                String recipient = "Desconocido";
+                                boolean isChannel = false;
+                                
+                                if (mensaje.getReceptorCanal() != null) {
+                                    recipient = mensaje.getReceptorCanal().getNombreCanal();
+                                    isChannel = true;
+                                } else if (mensaje.getReceptorUsuario() != null) {
+                                    recipient = mensaje.getReceptorUsuario().getNombreUsuario();
+                                }
+                                
+                                String sender = mensaje.getEmisor() != null ? 
+                                    mensaje.getEmisor().getNombreUsuario() : "Sistema";
+                                String transcription = mensaje.getContenidoTexto() != null ? 
+                                    mensaje.getContenidoTexto() : "[Sin transcripción]";
+                                String timestamp = mensaje.getTimestamp() != null ? 
+                                    mensaje.getTimestamp().toString() : new java.util.Date().toString();
+                                
+                                return new AudioListResponseDTO.AudioInfoDTO(
+                                        mensaje.getId(),
+                                        sender,
+                                        recipient,
+                                        mensaje.getRutaAudio(),
+                                        transcription,
+                                        timestamp,
+                                        isChannel
+                                );
+                            } catch (Exception mapException) {
+                                System.err.println("⚠️ Error mapeando audio: " + mapException.getMessage());
+                                return null;
+                            }
+                        })
+                        .filter(audio -> audio != null)
+                        .collect(Collectors.toList());
+            } catch (Exception queryException) {
+                System.err.println("⚠️ Error consultando audios: " + queryException.getMessage());
+                queryException.printStackTrace();
+                audioList = new ArrayList<>();
+            }
 
             AudioListResponseDTO response = new AudioListResponseDTO(
                     audioList.size(),
@@ -404,9 +441,10 @@ public class ServerApiController {
             logService.info("Lista de audios solicitada: " + audioList.size() + " audios", "ServerApiController");
             return ResponseEntity.ok(ApiResponseDTO.success(response));
         } catch (Exception e) {
-            logService.error("Error al obtener audios: " + e.getMessage(), "ServerApiController");
+            System.err.println("❌ Error crítico al obtener audios: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponseDTO.error("Error al obtener lista de audios"));
+                    .body(ApiResponseDTO.error("Error al obtener lista de audios: " + e.getMessage()));
         }
     }
 }
