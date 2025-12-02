@@ -122,6 +122,17 @@ class ServerApiService {
     const response = await apiClient.get(`${this.baseRoute}/api/v1/server/federation`);
     return response.data;
   }
+
+  // Audios
+  async getAudios(params = {}) {
+    const { limit = 50 } = params;
+    const queryParams = new URLSearchParams({ limit });
+    
+    const response = await apiClient.get(
+      `${this.baseRoute}/api/v1/server/audios?${queryParams}`
+    );
+    return response.data;
+  }
 }
 
 // Crear instancias de servicio para cada servidor

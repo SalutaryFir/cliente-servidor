@@ -1,15 +1,62 @@
-import { useState } from 'react';
-import { FileText, Trash2, Filter } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { FileText, Trash2, Filter, Play, Pause, Radio } from 'lucide-react';
 import { formatTimestamp, getLogLevelColor } from '../../utils/helpers';
 import { serverServices } from '../../services/api';
 
-function LogsSection({ logs, serverId }) {
+function LogsSection({ logs = { logs: [], totalLogs: 0 }, serverId }) {
   const [filter, setFilter] = useState('ALL');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [localLogs, setLocalLogs] = useState([]);
+  const logsEndRef = useRef(null);
+  const intervalRef = useRef(null);
 
-  const filteredLogs = logs.logs?.filter(log => 
+  // Asegurar que logs.logs existe
+  const allLogs = logs?.logs || [];
+  
+  // Usar logs locales si auto-refresh está activo, sino usar los del prop
+  const displayLogs = autoRefresh ? localLogs : allLogs;
+  
+  const filteredLogs = displayLogs.filter(log => 
     filter === 'ALL' || log.level === filter
-  ) || [];
+  );
+
+  // Auto-refresh de logs cada 2 segundos
+  useEffect(() => {
+    if (autoRefresh) {
+      const fetchLogs = async () => {
+        try {
+          const response = await serverServices[serverId].getLogs({ limit: 100 });
+          setLocalLogs(response?.data?.logs || []);
+        } catch (error) {
+          console.error('Error fetching logs:', error);
+        }
+      };
+
+      // Fetch inmediato
+      fetchLogs();
+      
+      // Luego cada 2 segundos
+      intervalRef.current = setInterval(fetchLogs, 2000);
+      
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
+  }, [autoRefresh, serverId]);
+
+  // Auto-scroll cuando hay nuevos logs
+  useEffect(() => {
+    if (autoRefresh && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [localLogs, autoRefresh]);
 
   const handleClearLogs = async () => {
     try {
@@ -24,10 +71,10 @@ function LogsSection({ logs, serverId }) {
 
   const logLevels = ['ALL', 'INFO', 'WARN', 'ERROR', 'DEBUG'];
   const levelCounts = {
-    INFO: logs.logs?.filter(l => l.level === 'INFO').length || 0,
-    WARN: logs.logs?.filter(l => l.level === 'WARN').length || 0,
-    ERROR: logs.logs?.filter(l => l.level === 'ERROR').length || 0,
-    DEBUG: logs.logs?.filter(l => l.level === 'DEBUG').length || 0,
+    INFO: allLogs.filter(l => l.level === 'INFO').length,
+    WARN: allLogs.filter(l => l.level === 'WARN').length,
+    ERROR: allLogs.filter(l => l.level === 'ERROR').length,
+    DEBUG: allLogs.filter(l => l.level === 'DEBUG').length,
   };
 
   return (
@@ -37,13 +84,41 @@ function LogsSection({ logs, serverId }) {
           <h3 className="text-xl font-bold text-gray-800 flex items-center">
             <FileText className="h-6 w-6 mr-2 text-primary-600" />
             Logs del Sistema
+            {autoRefresh && (
+              <span className="ml-3 flex items-center text-sm font-normal text-green-600">
+                <Radio className="h-4 w-4 mr-1 animate-pulse" />
+                EN VIVO
+              </span>
+            )}
           </h3>
           <p className="text-sm text-gray-600 mt-1">
-            {filteredLogs.length} de {logs.totalLogs} logs
+            {filteredLogs.length} de {autoRefresh ? localLogs.length : (logs?.totalLogs || 0)} logs
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {/* Botón Auto-refresh */}
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              autoRefresh
+                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            {autoRefresh ? (
+              <>
+                <Pause className="h-3 w-3" />
+                <span>Pausar</span>
+              </>
+            ) : (
+              <>
+                <Play className="h-3 w-3" />
+                <span>En Vivo</span>
+              </>
+            )}
+          </button>
+
           {/* Filtros */}
           <div className="flex items-center space-x-2">
             <Filter className="h-4 w-4 text-gray-600" />
@@ -125,8 +200,12 @@ function LogsSection({ logs, serverId }) {
           <div className="text-center py-8 text-gray-400">
             <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No hay logs disponibles</p>
+            {!autoRefresh && (
+              <p className="text-xs mt-2">Activa "En Vivo" para ver logs en tiempo real</p>
+            )}
           </div>
         )}
+        <div ref={logsEndRef} />
       </div>
     </div>
   );

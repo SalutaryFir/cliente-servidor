@@ -250,19 +250,6 @@ public class ServerApiController {
     @GetMapping("/stats")
     public ResponseEntity<ApiResponseDTO<ServerStatsResponseDTO>> getStats() {
         try {
-            Runtime runtime = Runtime.getRuntime();
-            long totalMemory = runtime.totalMemory() / (1024 * 1024);
-            long freeMemory = runtime.freeMemory() / (1024 * 1024);
-            long usedMemory = totalMemory - freeMemory;
-            int memoryPercent = (int) ((usedMemory * 100) / totalMemory);
-
-            ServerStatsResponseDTO.MemoryStats memoryStats = new ServerStatsResponseDTO.MemoryStats(
-                    totalMemory,
-                    usedMemory,
-                    freeMemory,
-                    memoryPercent
-            );
-
             ServerStatsResponseDTO stats = new ServerStatsResponseDTO(
                     serverName,
                     mensajeRepository.count(), // Total de mensajes procesados
@@ -271,8 +258,7 @@ public class ServerApiController {
                     (int) usuarioRepository.count(),
                     tcpServer.getClients().size(),
                     0.0, // Implementar métrica de tiempo de respuesta promedio
-                    System.currentTimeMillis() - serverStartTime,
-                    memoryStats
+                    System.currentTimeMillis() - serverStartTime
             );
 
             logService.info("Estadísticas del servidor solicitadas", "ServerApiController");
@@ -368,6 +354,59 @@ public class ServerApiController {
             logService.error("Error al obtener información de federación: " + e.getMessage(), "ServerApiController");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponseDTO.error("Error al obtener información de federación"));
+        }
+    }
+
+    /**
+     * GET /api/v1/server/audios
+     * Obtiene lista de audios procesados/transcritos
+     */
+    @GetMapping("/audios")
+    public ResponseEntity<ApiResponseDTO<AudioListResponseDTO>> getAudios(
+            @RequestParam(defaultValue = "50") int limit
+    ) {
+        try {
+            // Obtener mensajes que tienen audio (rutaAudio no nulo)
+            List<AudioListResponseDTO.AudioInfoDTO> audioList = mensajeRepository.findAll().stream()
+                    .filter(mensaje -> mensaje.getRutaAudio() != null && !mensaje.getRutaAudio().isEmpty())
+                    .sorted((m1, m2) -> m2.getTimestamp().compareTo(m1.getTimestamp())) // Más recientes primero
+                    .limit(limit)
+                    .map(mensaje -> {
+                        String recipient;
+                        boolean isChannel = false;
+                        
+                        if (mensaje.getReceptorCanal() != null) {
+                            recipient = mensaje.getReceptorCanal().getNombreCanal();
+                            isChannel = true;
+                        } else if (mensaje.getReceptorUsuario() != null) {
+                            recipient = mensaje.getReceptorUsuario().getNombreUsuario();
+                        } else {
+                            recipient = "Desconocido";
+                        }
+                        
+                        return new AudioListResponseDTO.AudioInfoDTO(
+                                mensaje.getId(),
+                                mensaje.getEmisor().getNombreUsuario(),
+                                recipient,
+                                mensaje.getRutaAudio(),
+                                mensaje.getContenidoTexto(), // La transcripción está en contenidoTexto
+                                mensaje.getTimestamp().toString(),
+                                isChannel
+                        );
+                    })
+                    .collect(Collectors.toList());
+
+            AudioListResponseDTO response = new AudioListResponseDTO(
+                    audioList.size(),
+                    audioList
+            );
+
+            logService.info("Lista de audios solicitada: " + audioList.size() + " audios", "ServerApiController");
+            return ResponseEntity.ok(ApiResponseDTO.success(response));
+        } catch (Exception e) {
+            logService.error("Error al obtener audios: " + e.getMessage(), "ServerApiController");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponseDTO.error("Error al obtener lista de audios"));
         }
     }
 }

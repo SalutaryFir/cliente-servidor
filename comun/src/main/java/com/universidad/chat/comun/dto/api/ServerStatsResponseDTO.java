@@ -21,15 +21,4 @@ public class ServerStatsResponseDTO implements Serializable {
     private int currentConnections;
     private double averageResponseTimeMs;
     private long uptimeMillis;
-    private MemoryStats memoryStats;
-    
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class MemoryStats implements Serializable {
-        private long totalMemoryMB;
-        private long usedMemoryMB;
-        private long freeMemoryMB;
-        private int memoryUsagePercent;
-    }
 }

@@ -6,6 +6,7 @@ import ChannelsSection from './dashboard/ChannelsSection';
 import LogsSection from './dashboard/LogsSection';
 import StatsSection from './dashboard/StatsSection';
 import FederationSection from './dashboard/FederationSection';
+import AudiosSection from './dashboard/AudiosSection';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 
@@ -118,13 +119,14 @@ function Dashboard({ selectedServer }) {
       {/* Federación */}
       {data.federation && <FederationSection federation={data.federation} />}
 
-      {/* Logs */}
-      {data.logs && (
-        <LogsSection 
-          logs={data.logs} 
-          serverId={selectedServer.id}
-        />
-      )}
+      {/* Audios Procesados */}
+      <AudiosSection serverId={selectedServer.id} />
+
+      {/* Logs - Siempre mostrar */}
+      <LogsSection 
+        logs={data.logs || { logs: [], totalLogs: 0 }} 
+        serverId={selectedServer.id}
+      />
     </div>
   );
 }
